@@ -127,9 +127,46 @@ def mean_encode_train_fold(folds, cats):
         for cat in cats:
             cat_name = "_".join(cat)
             feature_name = "{}_target_mean".format(cat_name)
-            train_target_mean = tf.groupby(cat).agg({'target': 'mean'})\
+            train_target_mean = tf.groupby(cat).agg({'target': 'mean'}) \
                 .rename(columns={'target': feature_name})
             vf = vf.merge(train_target_mean, left_on=cat, right_index=True, how='left')
         resulting.append((encoded, vf))
 
     return resulting
+
+
+def aggregates_features(data, receipt):
+    target_group, rec = receipt
+    b = data[[*target_group, *list(rec.keys())]]
+    a = b.groupby(target_group).agg(rec)
+    a.columns = ["_".join(x) for x in a.columns.ravel()]
+    merged = b.merge(a, left_on=target_group, right_index=True, how='left')
+    df = {}
+    target_group_name = "_".join(target_group)
+    for k in rec.keys():
+        target_cat = k
+        names = (["{}_{}".format(k, x) for x in rec[k]])
+        for name in names:
+            col = merged[target_cat]
+            col_name = "{}_group_{}".format(name, target_group_name)
+            df[col_name] = col
+    return pd.DataFrame(df)
+
+
+def filter_features(data, threshold=0.9, missing_threshold=0.75):
+    # I don't trust these features
+    cols_with_id = [x for x in data.columns if 'id' in x]
+    print("Id features: %d" % (len(cols_with_id)))
+
+    corr_matrix = data.corr().abs()
+    upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
+    highly_correlated = [column for column in upper.columns if any(upper[column] > threshold)]
+    print('High correlation features: %d' % (len(highly_correlated)))
+
+    missing = (data.isnull().sum() / len(data)).sort_values(ascending=False)
+    missing = list(missing.index[missing > missing_threshold])
+    print('Columns with more than %f missing values: %d' % (missing_threshold, len(missing)))
+    features_to_drop = [*cols_with_id, *highly_correlated, *missing]
+
+    print("Dropping total: %d" % len(features_to_drop))
+    return data.drop(columns=features_to_drop)
