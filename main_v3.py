@@ -23,12 +23,16 @@ config = {
     'verbose': -1
 }
 
-train = pd.read_pickle(DATA_FOLDER + '/v3/train.pkl')
+features = list(pd.read_csv(DATA_FOLDER + '/v3/importances.csv', index_col=0).head(800).index)
+train_features = [*features, "target"]
+
+
+train = pd.read_pickle(DATA_FOLDER + '/v3/train.pkl')[train_features]
 folds = prepare_folds(train)
 
 models, result = train_folds(folds, config)
 
-test = load_test(DATA_FOLDER + '/v3/test.pkl')
+test = load_test(DATA_FOLDER + '/v3/test.pkl')[features]
 test_target = evaluate(models, test)
 
 print("AUC: %.4f, F1: %.4f" % (result['auc'], result['f1']))

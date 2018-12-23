@@ -22,7 +22,7 @@ def load_test(path):
 def prepare_folds(data):
     kfold = StratifiedKFold(n_splits=global_config['folds'], random_state=42)
     folds_data = []
-    for ids in kfold.split(data.id.values, data.target.values):
+    for ids in kfold.split(data.index.values, data.target.values):
         train, test = ids
         folds_data.append((data.iloc[train], data.iloc[test]))
 
@@ -147,7 +147,7 @@ def aggregates_features(data, receipt):
         target_cat = k
         names = (["{}_{}".format(k, x) for x in rec[k]])
         for name in names:
-            col = merged[target_cat]
+            col = merged[name]
             col_name = "{}_group_{}".format(name, target_group_name)
             df[col_name] = col
     return pd.DataFrame(df)
@@ -155,8 +155,8 @@ def aggregates_features(data, receipt):
 
 def filter_features(data, threshold=0.9, missing_threshold=0.75):
     # I don't trust these features
-    cols_with_id = [x for x in data.columns if 'id' in x]
-    print("Id features: %d" % (len(cols_with_id)))
+    # cols_with_id = [x for x in data.columns if 'id' in x]
+    # print("Id features: %d" % (len(cols_with_id)))
 
     corr_matrix = data.corr().abs()
     upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
@@ -166,7 +166,7 @@ def filter_features(data, threshold=0.9, missing_threshold=0.75):
     missing = (data.isnull().sum() / len(data)).sort_values(ascending=False)
     missing = list(missing.index[missing > missing_threshold])
     print('Columns with more than %f missing values: %d' % (missing_threshold, len(missing)))
-    features_to_drop = [*cols_with_id, *highly_correlated, *missing]
+    features_to_drop = [*highly_correlated, *missing]
 
     print("Dropping total: %d" % len(features_to_drop))
     return data.drop(columns=features_to_drop)
